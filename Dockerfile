@@ -1,19 +1,22 @@
-FROM eclipse-temurin:21-jdk-alpine
-
+FROM maven:3.9.3-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
-# Construimos el JAR dentro del contenedor
+# Copiamos los archivos necesarios
 COPY pom.xml .
 COPY src ./src
 
-RUN ./mvnw clean package -DskipTests
+# Build del JAR
+RUN mvn clean package -DskipTests
 
-# Copiamos el JAR reempaquetado
-RUN cp target/control-empleados-1.0.jar app.jar
+# Segunda etapa: runtime
+FROM eclipse-temurin:21-jdk-alpine
+WORKDIR /app
 
-# Exponemos un puerto genérico, Render usa $PORT
-EXPOSE 8081
+# Copiamos el JAR compilado de la etapa anterior
+COPY --from=build /app/target/control-empleados-1.0.jar app.jar
 
-# Shell form para que $PORT se expanda
-ENTRYPOINT java -XX:MaxRAMPercentage=75 -Dserver.port=$PORT -jar app.jar
+# Puerto que Render asigna
+ENV PORT 8081
+EXPOSE $PORT
 
+ENTRYPOINT java -Dserver.port=$PORT -jar app.jar
