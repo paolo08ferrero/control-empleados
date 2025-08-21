@@ -1,4 +1,4 @@
-FROM maven:3.9.3-eclipse-temurin-21-alpine AS build
+FROM maven:3.9.3-eclipse-temurin-21-slim AS build
 WORKDIR /app
 
 # Copiamos los archivos necesarios
