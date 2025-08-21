@@ -1,5 +1,5 @@
-# Usamos JDK 17 Alpine, liviano
-FROM eclipse-temurin:17-jdk-alpine
+# Usamos JDK 21 Alpine, liviano
+FROM eclipse-temurin:21-jdk-alpine
 
 # Carpeta de trabajo dentro del contenedor
 WORKDIR /app
