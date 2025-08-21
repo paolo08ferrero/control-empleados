@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Fichaje - Control Empleados</title>
+    <style>
+        /* Reset básico */
+        * { box-sizing: border-box; margin:0; padding:0; }
+        html, body {
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f7fa;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* CONTENEDOR PRINCIPAL */
+        .container {
+            background: #fff;
+            padding: 50px 60px; /* más grande */
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px; /* más ancho */
+            text-align: center;
+        }
+
+        h1 { 
+            margin-bottom: 30px;
+            color: #333; 
+            font-weight: 700; 
+            font-size: 2.5rem; /* más grande */
+        }
+
+        #usuarioInfo { 
+            margin-bottom: 35px; 
+            font-size: 1.3rem; 
+            color: #555; 
+            min-height: 30px; 
+        }
+
+        /* Botones */
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #1976d2;
+            border: none;
+            color: white;
+            padding: 24px 48px; /* más grande */
+            font-size: 2rem;    /* más grande */
+            border-radius: 8px;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 3px 7px rgba(25, 118, 210, 0.4);
+            user-select: none;
+            min-width: 260px;   /* más ancho */
+        }
+        button:disabled {
+            background-color: #999;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        button:hover:enabled {
+            background-color: #1565c0;
+            box-shadow: 0 6px 12px rgba(21, 101, 192, 0.6);
+        }
+        button:active:enabled {
+            background-color: #0d47a1;
+            box-shadow: 0 2px 5px rgba(13, 71, 161, 0.8);
+        }
+
+        #mensaje {
+            margin-top: 25px;
+            font-weight: 600;
+            min-height: 28px;
+            font-size: 1.2rem;
+            transition: color 0.3s ease;
+            word-wrap: break-word;
+        }
+
+        /* ---------------- RESPONSIVE ---------------- */
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 35px;
+                max-width: 90%;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            #usuarioInfo {
+                font-size: 1.1rem;
+            }
+            .btn-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+            button {
+                width: 100%;
+                font-size: 1.5rem;
+                padding: 18px 0;
+                min-width: unset;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            .container {
+                padding: 40px 50px;
+                max-width: 500px;
+            }
+            button {
+                min-width: 220px;
+                padding: 22px 44px;
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Fichaje de Empleado</h1>
+    <div id="usuarioInfo"></div>
+    <div class="btn-group">
+        <button id="btnEntrada">Fichar Entrada</button>
+        <button id="btnSalida">Fichar Salida</button>
+    </div>
+    <p id="mensaje"></p>
+</div>
+
+<script>
+const usuarioInfo = document.getElementById('usuarioInfo');
+const mensaje = document.getElementById('mensaje');
+const btnEntrada = document.getElementById('btnEntrada');
+const btnSalida = document.getElementById('btnSalida');
+
+btnEntrada.disabled = true;
+btnSalida.disabled = true;
+
+// Función para obtener empleado logueado desde backend
+async function obtenerEmpleadoLogueado() {
+    try {
+        const resp = await fetch('/api/empleado-logueado');
+        if (!resp.ok) throw new Error('No logueado');
+        const empleado = await resp.json();
+        sessionStorage.setItem('empleado', JSON.stringify(empleado));
+        usuarioInfo.textContent = `Empleado: ${empleado.nombre} (Usuario: ${empleado.usuario})`;
+        return empleado;
+    } catch (err) {
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'No estás logueado. Redirigiendo al login...';
+        setTimeout(() => window.location.href = '/', 1500);
+        return null;
+    }
+}
+
+// Función para actualizar estado de botones según último fichaje
+async function actualizarBotones(empleado) {
+    try {
+        const resp = await fetch(`/api/fichajes-por-empleado/${empleado.id}`);
+        const fichajes = await resp.json();
+        const fichajesES = fichajes.filter(f => f.tipo === "ENTRADA" || f.tipo === "SALIDA");
+        if (fichajesES.length > 0) {
+            fichajesES.sort((a,b) => new Date(b.fechaHora) - new Date(a.fechaHora));
+            const ultimoTipo = fichajesES[0].tipo;
+            btnEntrada.disabled = ultimoTipo === "ENTRADA";
+            btnSalida.disabled = ultimoTipo === "SALIDA";
+        } else {
+            btnEntrada.disabled = false;
+            btnSalida.disabled = true;
+        }
+    } catch (err) {
+        console.error('Error al obtener fichajes:', err);
+        btnEntrada.disabled = false;
+        btnSalida.disabled = true;
+    }
+}
+
+// Función para fichar
+async function fichar(tipo) {
+    const empleado = JSON.parse(sessionStorage.getItem('empleado'));
+    if (!empleado) return;
+
+    mensaje.style.color = 'black';
+    mensaje.textContent = 'Obteniendo ubicación...';
+
+    if (!navigator.geolocation) {
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'Geolocalización no soportada por el navegador.';
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        mensaje.textContent = 'Enviando datos de fichaje...';
+
+        const params = new URLSearchParams();
+        params.append('empleadoId', empleado.id);
+        params.append('tipo', tipo);
+        params.append('latitud', lat);
+        params.append('longitud', lon);
+
+        try {
+            const response = await fetch('/api/fichar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: params.toString()
+            });
+
+            if (response.ok) {
+                mensaje.style.color = 'green';
+                mensaje.textContent = `Fichaje de ${tipo.toLowerCase()} registrado correctamente.`;
+                await actualizarBotones(empleado);
+            } else {
+                const errorText = await response.text();
+                mensaje.style.color = 'red';
+                mensaje.textContent = 'Error: ' + errorText;
+            }
+        } catch (error) {
+            mensaje.style.color = 'red';
+            mensaje.textContent = 'Error de conexión: ' + error.message;
+        }
+    }, (error) => {
+        mensaje.style.color = 'red';
+        mensaje.textContent = 'Error al obtener ubicación: ' + error.message;
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+}
+
+// Inicialización
+(async () => {
+    const empleado = await obtenerEmpleadoLogueado();
+    if (!empleado) return;
+    await actualizarBotones(empleado);
+
+    // Refrescar botones cada 10 segundos
+    setInterval(() => actualizarBotones(empleado), 10000);
+
+    // Actualización automática de ubicación
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const params = new URLSearchParams();
+            params.append('empleadoId', empleado.id);
+            params.append('latitud', lat);
+            params.append('longitud', lon);
+            try {
+                await fetch('/api/actualizar-ubicacion', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: params.toString()
+                });
+            } catch (error) {
+                console.error('Error al actualizar ubicación:', error);
+            }
+        }, (error) => console.error('Error geolocalización:', error.message),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+    }
+})();
+
+btnEntrada.addEventListener('click', () => fichar('ENTRADA'));
+btnSalida.addEventListener('click', () => fichar('SALIDA'));
+</script>
+</body>
+</html>
