@@ -1,24 +1,32 @@
+# -------------------------------
 # Etapa 1: Build
+# -------------------------------
 FROM maven:3.9.3-eclipse-temurin-21 AS build
+
+# Directorio de trabajo
 WORKDIR /app
 
-# Copiamos los archivos de configuración y código
+# Copiamos pom.xml primero para cache de dependencias
 COPY pom.xml .
+
+# Copiamos el código fuente
 COPY src ./src
 
-# Compilamos el proyecto, sin tests para acelerar
+# Construimos el JAR sin tests
 RUN mvn clean package -DskipTests
 
+# -------------------------------
 # Etapa 2: Runtime
+# -------------------------------
 FROM eclipse-temurin:21-jdk-alpine
+
 WORKDIR /app
 
-# Copiamos el JAR reempaquetado desde la etapa de build
+# Copiamos el JAR desde la etapa de build
 COPY --from=build /app/target/*.jar app.jar
 
-# Configuramos el puerto dinámico que Render asigna
-ENV SERVER_PORT=$PORT
-EXPOSE $PORT
+# Puerto dinámico para Render
+EXPOSE 8080
 
-# Comando para ejecutar la aplicación
-ENTRYPOINT ["java","-jar","app.jar"]
+# Comando para ejecutar la app con Spring profile "production"
+ENTRYPOINT ["java","-jar","-Dspring.profiles.active=production","app.jar"]
