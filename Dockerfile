@@ -1,22 +1,24 @@
-FROM maven:3.9.3-eclipse-temurin-21-slim AS build
+# Etapa 1: Build
+FROM maven:3.9.3-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Copiamos los archivos necesarios
+# Copiamos los archivos de configuración y código
 COPY pom.xml .
 COPY src ./src
 
-# Build del JAR
+# Compilamos el proyecto, sin tests para acelerar
 RUN mvn clean package -DskipTests
 
-# Segunda etapa: runtime
+# Etapa 2: Runtime
 FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
 
-# Copiamos el JAR compilado de la etapa anterior
-COPY --from=build /app/target/control-empleados-1.0.jar app.jar
+# Copiamos el JAR reempaquetado desde la etapa de build
+COPY --from=build /app/target/*.jar app.jar
 
-# Puerto que Render asigna
-ENV PORT 8081
+# Configuramos el puerto dinámico que Render asigna
+ENV SERVER_PORT=$PORT
 EXPOSE $PORT
 
-ENTRYPOINT java -Dserver.port=$PORT -jar app.jar
+# Comando para ejecutar la aplicación
+ENTRYPOINT ["java","-jar","app.jar"]
